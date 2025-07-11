@@ -13,8 +13,27 @@ import (
 
 var POLLING_WINDOW int = 1
 
+// StartPingLoop sends periodic WebSocket pings and stops on failure
+func StartPingLoop(conn *websocket.Conn, doneChan chan struct{}) {
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+			log.Printf("WebSocket ping failed: %v", err)
+			conn.Close()
+			select {
+			case <-doneChan:
+			default:
+				close(doneChan)
+			}
+			return
+		}
+	}
+}
+
 // PollAndStreamMessages continuously polls S3 for new message files and streams them to the subscriber
-func PollAndStreamMessages(conn *websocket.Conn, topic string, subscriberID string, checkpoint *SubscriberCheckpoint) {
+func PollAndStreamMessages(conn *websocket.Conn, topic string, subscriberID string, checkpoint *SubscriberCheckpoint, doneChan <-chan struct{}) {
 	ticker := time.NewTicker(time.Duration(POLLING_WINDOW) * time.Second) // Poll every 5 seconds (adjust as needed)
 	defer ticker.Stop()
 
@@ -22,13 +41,18 @@ func PollAndStreamMessages(conn *websocket.Conn, topic string, subscriberID stri
 
 	for {
 		select {
-		case <-ticker.C:
-			err := checkAndStreamNewMessages(conn, topic, subscriberID, checkpoint)
-			if err != nil {
-				log.Printf("Streaming error for subscriber %s: %v", subscriberID, err)
-				return // Exit on error (client likely disconnected)
-			}
+			case <-doneChan:
+				log.Printf("Polling Stopped for Subscriber [%s] on topic [%s]", subscriberID, topic)
+				return
+
+			case <-ticker.C:
+				err := checkAndStreamNewMessages(conn, topic, subscriberID, checkpoint)
+				if err != nil {
+					log.Printf("Streaming error for subscriber %s: %v", subscriberID, err)
+					return // Exit on error (client likely disconnected)
+				}
 		}
+		
 	}
 }
 

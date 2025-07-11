@@ -1,7 +1,9 @@
 package main
 
 import (
+	"flag"
 	"flux_reader/services"
+	"flux_reader/config"
 	"log"
 	"net/http"
 	"os"
@@ -10,6 +12,10 @@ import (
 )
 
 func main() {
+
+	flag.StringVar(&config.ReaderID, "reader", "flux-reader-default", "Name of this FluxReader")
+	flag.Parse()
+
 	// Step 1: Load environment variables
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file found, using default AWS environment")

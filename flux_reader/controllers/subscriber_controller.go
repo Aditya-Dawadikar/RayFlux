@@ -5,13 +5,14 @@ import (
 	"flux_reader/services"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
-		return true // Allow all origins for now
+		return true
 	},
 }
 
@@ -21,6 +22,7 @@ type SubscribeRequest struct {
 }
 
 func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
+
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Printf("WebSocket upgrade failed: %v", err)
@@ -30,23 +32,31 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	log.Println("Subscriber connected.")
 
-	// Step 1: Receive initial message → extract topic and subscriber_id
 	_, message, err := conn.ReadMessage()
 	if err != nil {
-		log.Printf("Failed to read initial message: %v", err)
+		log.Printf("Failed to read subscription request: %v", err)
 		return
 	}
 
 	var req SubscribeRequest
 	if err := json.Unmarshal(message, &req); err != nil || req.Topic == "" || req.SubscriberID == "" {
-		log.Printf("Invalid subscription request: %v", err)
 		conn.WriteMessage(websocket.TextMessage, []byte(`{"error":"Invalid subscription request"}`))
 		return
 	}
 
 	log.Printf("Subscriber [%s] for topic [%s] connected.", req.SubscriberID, req.Topic)
 
-	// Step 2: Load checkpoint
+	// WebSocket ping-pong for dead connection detection
+	conn.SetReadDeadline(time.Now().Add(30 * time.Second))
+	conn.SetPongHandler(func(appData string) error {
+		conn.SetReadDeadline(time.Now().Add(30 * time.Second))
+		return nil
+	})
+
+	doneChan := make(chan struct{})
+
+	go services.StartPingLoop(conn, doneChan)
+
 	checkpoint, err := services.LoadCheckpoint(req.Topic, req.SubscriberID)
 	if err != nil {
 		log.Printf("Failed to load checkpoint: %v", err)
@@ -54,6 +64,8 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Step 3: Start polling and streaming loop (blocking)
-	services.PollAndStreamMessages(conn, req.Topic, req.SubscriberID, checkpoint)
+	services.PollAndStreamMessages(conn, req.Topic, req.SubscriberID, checkpoint, doneChan)
+
+	log.Printf("Connection closed for subscriber [%s] on topic [%s]", req.SubscriberID, req.Topic)
 }
+
