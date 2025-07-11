@@ -46,14 +46,39 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("Subscriber [%s] for topic [%s] connected.", req.SubscriberID, req.Topic)
 
+	
+	doneChan := make(chan struct{})
+	ackChan := make(chan map[string]string, 1)
+
+	go func() {
+		for {
+			_, msg, err := conn.ReadMessage()
+			if err != nil {
+				log.Printf("ReadMessage error: %v", err)
+				close(doneChan)
+				return
+			}
+
+			// Try to decode ACK
+			var ack map[string]string
+			if json.Unmarshal(msg, &ack) == nil && ack["batch_id"] != "" {
+				select {
+				case ackChan <- ack:
+				default:
+					// drop if nobody is waiting
+				}
+			}
+		}
+	}()
+
 	// WebSocket ping-pong for dead connection detection
 	conn.SetReadDeadline(time.Now().Add(30 * time.Second))
 	conn.SetPongHandler(func(appData string) error {
+		log.Printf("Received Pong from client: %s", appData)
 		conn.SetReadDeadline(time.Now().Add(30 * time.Second))
 		return nil
 	})
 
-	doneChan := make(chan struct{})
 
 	go services.StartPingLoop(conn, doneChan)
 
@@ -64,7 +89,7 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	services.PollAndStreamMessages(conn, req.Topic, req.SubscriberID, checkpoint, doneChan)
+	services.PollAndStreamMessages(conn, req.Topic, req.SubscriberID, checkpoint, doneChan, ackChan)
 
 	log.Printf("Connection closed for subscriber [%s] on topic [%s]", req.SubscriberID, req.Topic)
 }

@@ -6,6 +6,7 @@ import (
 	"log"
 	"time"
 	"bytes"
+	"encoding/json"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/gorilla/websocket"
@@ -18,22 +19,23 @@ func StartPingLoop(conn *websocket.Conn, doneChan chan struct{}) {
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-			log.Printf("WebSocket ping failed: %v", err)
-			conn.Close()
-			select {
-			case <-doneChan:
-			default:
-				close(doneChan)
+	for {
+		select {
+		case <-ticker.C:
+			if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				log.Println("Ping failed:", err)
+				close(doneChan)  // Signal PollAndStream to stop
+				return
 			}
+		case <-doneChan:
 			return
 		}
 	}
 }
 
+
 // PollAndStreamMessages continuously polls S3 for new message files and streams them to the subscriber
-func PollAndStreamMessages(conn *websocket.Conn, topic string, subscriberID string, checkpoint *SubscriberCheckpoint, doneChan <-chan struct{}) {
+func PollAndStreamMessages(conn *websocket.Conn, topic string, subscriberID string, checkpoint *SubscriberCheckpoint, doneChan <-chan struct{}, ackChan <-chan map[string]string) {
 	ticker := time.NewTicker(time.Duration(POLLING_WINDOW) * time.Second) // Poll every 5 seconds (adjust as needed)
 	defer ticker.Stop()
 
@@ -46,7 +48,7 @@ func PollAndStreamMessages(conn *websocket.Conn, topic string, subscriberID stri
 				return
 
 			case <-ticker.C:
-				err := checkAndStreamNewMessages(conn, topic, subscriberID, checkpoint)
+				err := checkAndStreamNewMessages(conn, topic, subscriberID, checkpoint, ackChan)
 				if err != nil {
 					log.Printf("Streaming error for subscriber %s: %v", subscriberID, err)
 					return // Exit on error (client likely disconnected)
@@ -57,7 +59,8 @@ func PollAndStreamMessages(conn *websocket.Conn, topic string, subscriberID stri
 }
 
 // checkAndStreamNewMessages fetches new files from S3, streams them, and updates checkpoint
-func checkAndStreamNewMessages(conn *websocket.Conn, topic, subscriberID string, checkpoint *SubscriberCheckpoint) error {
+func checkAndStreamNewMessages(conn *websocket.Conn, topic, subscriberID string, checkpoint *SubscriberCheckpoint, ackChan <-chan map[string]string) error {
+	const maxRetries = 3
 	prefix := fmt.Sprintf("rayflux/%s/", topic)
 
 	log.Printf("Polling S3 for new files under prefix: %s", prefix)
@@ -89,23 +92,76 @@ func checkAndStreamNewMessages(conn *websocket.Conn, topic, subscriberID string,
 		log.Printf("Sending file %s to subscriber [%s] (%d bytes)", fileKey, subscriberID, len(content))
 
 
-		// Stream content (naive: send full file as one message)
-		err = conn.WriteMessage(websocket.TextMessage, content)
+		message := map[string]interface{}{
+			"batch_id": fileKey,
+			"messages": string(content),
+		}
+
+		messageBytes, err:= json.Marshal(message)
 		if err != nil {
 			return fmt.Errorf("failed to send message: %w", err)
 		}
 
-		// Update checkpoint in memory
-		checkpoint.LastReadFile = fileKey
-		checkpoint.LastReadTimeUTC = time.Now().UTC().Format(time.RFC3339)
+		var success bool
+		var retries int
+		for retries=0; retries < maxRetries; retries++{
 
-		// Persist updated checkpoint
-		err = SaveCheckpoint(topic, subscriberID, checkpoint)
-		if err != nil {
-			log.Printf("Failed to save checkpoint: %v", err)
-		}else {
-			log.Printf("Checkpoint updated: LastReadFile = %s", fileKey)
+			log.Printf("Retry %d/3", retries+1)
+
+			// send the msg batch
+			err = conn.WriteMessage(websocket.TextMessage, messageBytes)
+			if err != nil{
+				log.Printf("Failed to send message: %v", err)
+				break
+			}
+
+			select {
+			case ack := <-ackChan:
+				if ack["batch_id"] == fileKey && ack["status"] == "ok" {
+					log.Printf("Ack Received: %s", ack["batch_id"])
+
+					checkpoint.LastReadFile = fileKey
+					checkpoint.LastReadTimeUTC = time.Now().UTC().Format(time.RFC3339)
+
+					err = SaveCheckpoint(topic, subscriberID, checkpoint)
+					if err != nil {
+						log.Printf("Failed to save checkpoint: %v", err)
+					} else {
+						log.Printf("Checkpoint updated: LastReadFile = %s", fileKey)
+					}
+
+					success = true
+
+					break
+				} else {
+					log.Printf("Invalid ACK received: %+v", ack)
+					continue
+				}
+			case <-time.After(10 * time.Second):
+				log.Printf("ACK timeout on attempt %d", retries+1)
+				continue
+			}
+
+			if success{
+				break
+			}
 		}
+
+		
+
+		if retries == maxRetries {
+			log.Printf("No ACK received after %d retries. Closing connection.", maxRetries)
+
+			closeErr:= conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "No ACK received"))
+			if closeErr != nil {
+				log.Printf("Error sending close message: %v", closeErr)
+			}
+
+			conn.Close()
+			
+			return fmt.Errorf("client unresponsive, terminating session")
+		}
+		
 	}
 
 	return nil
