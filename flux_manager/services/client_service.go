@@ -10,6 +10,14 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
+type SubscriberCheckpoint struct {
+	Topic           string `json:"topic"`
+	SubscriberID    string `json:"subscriber_id"`
+	LastReadFile    string `json:"last_read_file"`
+	LastReadTimeUTC string `json:"last_read_time_utc"`
+}
+
+
 // RegisterPublisher adds a publisher to the topic index file
 func RegisterPublisher(topic string, publisherID string) error {
 	index, err := GetTopic(topic)
@@ -82,7 +90,12 @@ func RegisterSubscriber(topic string, subscriberID string) error {
 		index.Subscribers = append(index.Subscribers, newSub)
 	}
 
-	return saveTopicIndex(topic, index)
+	if err := saveTopicIndex(topic, index); err != nil {
+		return err
+	}
+
+	return createInitialCheckpoint(topic, subscriberID)
+
 }
 
 
@@ -154,4 +167,28 @@ func SoftDeleteSubscriber(topic string, subscriberID string) error {
 	}
 
 	return saveTopicIndex(topic, index)
+}
+
+func createInitialCheckpoint(topic string, subscriberID string) error {
+	checkpointKey := fmt.Sprintf("rayflux/checkpoints/%s/%s.json", topic, subscriberID)
+
+	checkpoint := SubscriberCheckpoint{
+		Topic:           topic,
+		SubscriberID:    subscriberID,
+		LastReadFile:    "",  // Nothing read yet
+		LastReadTimeUTC: time.Now().UTC().Format(time.RFC3339),
+	}
+
+	checkpointBytes, err := json.Marshal(checkpoint)
+	if err != nil {
+		return fmt.Errorf("failed to marshal checkpoint: %w", err)
+	}
+
+	_, err = S3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+		Bucket: &TopicBucket,
+		Key:    &checkpointKey,
+		Body:   strings.NewReader(string(checkpointBytes)),
+	})
+
+	return err
 }
