@@ -4,7 +4,6 @@ import (
 	"flux_manager/services"
 	"log"
 	"net/http"
-	"os"
 
 	"github.com/joho/godotenv"
 )
@@ -16,11 +15,7 @@ func main(){
 	}
 
 	// Step 1: Initialize S3 Client
-	bucketName := os.Getenv("S3_BUCKET")
-	if bucketName == "" {
-		log.Fatal("S3_BUCKET not set in .env")
-	}
-	services.SetupS3(bucketName)
+	services.SetupS3()
 
 	router := SetupRoutes()
 

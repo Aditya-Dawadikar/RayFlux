@@ -10,7 +10,7 @@ import (
 )
 
 var S3Client *s3.Client
-var TopicBucket string
+var BucketName string
 
 func SetupS3() {
 	cfg, err := config.LoadDefaultConfig(context.TODO())
@@ -20,8 +20,8 @@ func SetupS3() {
 
 	S3Client = s3.NewFromConfig(cfg)
 
-	TopicBucket = os.Getenv("S3_BUCKET")
-	if TopicBucket == "" {
+	BucketName = os.Getenv("S3_BUCKET")
+	if BucketName == "" {
 		log.Fatal("S3_BUCKET not set in environment")
 	}
 }

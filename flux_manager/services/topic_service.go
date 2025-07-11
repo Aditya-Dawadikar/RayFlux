@@ -5,13 +5,10 @@ import (
 	"fmt"
 	"strings"
 	"encoding/json"
-	// "log"
-	
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
-var TopicBucket = "rayflux-store"  // You can move this to .env later
 
 type ClientMetadata struct {
 	ID          string `json:"id"`
@@ -55,33 +52,24 @@ func CreateTopic(topic string) error {
 func ListTopics() ([]string, error) {
 	prefix := "rayflux/topic/"
 
-	// log.Printf("Listing topics with prefix: %s in bucket: %s", prefix, TopicBucket)
 
 	resp, err := S3Client.ListObjectsV2(context.TODO(), &s3.ListObjectsV2Input{
 		Bucket: &TopicBucket,
 		Prefix: &prefix,
 	})
 	if err !=nil{
-		// log.Printf("Failed to list S3 objects: %v", err)
 		return nil, err
 	}
 
-	// if len(resp.Contents) == 0 {
-	// 	log.Println("No topics found in S3.")
-	// }
-
 	var topics []string
 	for _, obj:= range resp.Contents{
-		// log.Printf("Found object key: %s", *obj.Key)
 		key := *obj.Key
 		if strings.HasSuffix(key, ".json") {
 			topic := strings.TrimSuffix(strings.TrimPrefix(key, prefix), ".json")
-			// log.Printf("Parsed topic: %s", topic)
 			topics = append(topics, topic)
 		}
 	}
 
-	// log.Printf("Final topics list: %+v", topics)
 
 	return topics, nil
 
