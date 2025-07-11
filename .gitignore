@@ -1,0 +1,26 @@
+# Go build artifacts
+/bin/
+/build/
+/dist/
+*.exe
+*.out
+*.test
+
+# Local environment files
+.env
+
+# IDE/editor settings
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Go module files (optional: keep these if you use Go modules)
+# go.sum
+
+secrets.txt
+reference.txt
