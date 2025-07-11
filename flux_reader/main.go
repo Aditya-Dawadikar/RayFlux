@@ -17,8 +17,16 @@ func main() {
 	flag.Parse()
 
 	// Step 1: Load environment variables
-	if err := godotenv.Load(); err != nil {
-		log.Println("No .env file found, using default AWS environment")
+	env := os.Getenv("ENV")
+	if env == "dev_local" {
+		err := godotenv.Load()
+		if err != nil {
+			log.Println("No .env file found, using system environment")
+		} else {
+			log.Println(".env file loaded successfully")
+		}
+	} else {
+		log.Println("Running in", env, "— using environment variables only")
 	}
 
 	// Step 2: Initialize S3 Client and Bucket
