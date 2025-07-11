@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flux-emitter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: flux-emitter
+  template:
+    metadata:
+      labels:
+        app: flux-emitter
+    spec:
+      containers:
+      - name: flux-emitter
+        image: flux_emitter:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8080
+        envFrom:
+          - configMapRef:
+              name: flux-config
+          - secretRef:
+              name: flux-secrets
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: flux-emitter
+spec:
+  selector:
+    app: flux-emitter
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 8080
+  type: ClusterIP

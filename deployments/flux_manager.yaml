@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flux-manager
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: flux-manager
+  template:
+    metadata:
+      labels:
+        app: flux-manager
+    spec:
+      containers:
+      - name: flux-manager
+        image: flux_manager:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8081
+        envFrom:
+          - configMapRef:
+              name: flux-config
+          - secretRef:
+              name: flux-secrets
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: flux-manager
+spec:
+  selector:
+    app: flux-manager
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 8081
+  type: ClusterIP
