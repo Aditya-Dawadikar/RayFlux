@@ -1,0 +1,18 @@
+apiVersion: skaffold/v2beta6
+kind: Config
+metadata:
+  name: flux-reader
+
+build:
+  artifacts:
+  - image: flux_reader
+    context: .
+    docker:
+      dockerfile: Dockerfile
+  local:
+    push: false
+
+deploy:
+  kubectl:
+    manifests:
+    - ../deployments/flux_reader.yaml

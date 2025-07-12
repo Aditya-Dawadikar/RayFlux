@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: flux-reader
 spec:
-  replicas: 1
+  replicas: 3
   selector:
     matchLabels:
       app: flux-reader
@@ -23,16 +23,16 @@ spec:
               name: flux-config
           - secretRef:
               name: flux-secrets
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: flux-reader
-spec:
-  selector:
-    app: flux-reader
-  ports:
-  - protocol: TCP
-    port: 80
-    targetPort: 8082
-  type: ClusterIP
+# ---
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: flux-reader
+# spec:
+#   selector:
+#     app: flux-reader
+#   ports:
+#   - protocol: TCP
+#     port: 80
+#     targetPort: 8082
+#   type: ClusterIP

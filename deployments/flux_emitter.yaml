@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: flux-emitter
 spec:
-  replicas: 1
+  replicas: 3
   selector:
     matchLabels:
       app: flux-emitter
@@ -23,16 +23,16 @@ spec:
               name: flux-config
           - secretRef:
               name: flux-secrets
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: flux-emitter
-spec:
-  selector:
-    app: flux-emitter
-  ports:
-  - protocol: TCP
-    port: 80
-    targetPort: 8080
-  type: ClusterIP
+# ---
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: flux-emitter
+# spec:
+#   selector:
+#     app: flux-emitter
+#   ports:
+#   - protocol: TCP
+#     port: 80
+#     targetPort: 8080
+#   type: ClusterIP
