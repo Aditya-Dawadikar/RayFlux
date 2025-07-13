@@ -10,5 +10,6 @@ import (
 func SetupRoutes() http.Handler {
 	r := mux.NewRouter()
 	r.HandleFunc("/publish", proxy.ProxyPublish).Methods("POST")
+	r.HandleFunc("/subscribe", proxy.ProxySubscribe).Methods("GET")
 	return r
 }
