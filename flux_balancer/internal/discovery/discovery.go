@@ -2,7 +2,6 @@ package discovery
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
 	"time"
@@ -57,6 +56,13 @@ func watchPods(labelSelector string, store *[]string) {
 
 		var updated []string
 		for _, pod := range pods.Items {
+
+			// for _, c := range pod.Spec.Containers {
+			// 	for _, port := range c.Ports {
+			// 		log.Printf("Pod: %s, Container: %s, Port: %d", pod.Name, c.Name, port.ContainerPort)
+			// 	}
+			// }
+
 			if pod.Status.Phase == v1.PodRunning {
 				ip := pod.Status.PodIP
 
