@@ -2,7 +2,7 @@ package controllers
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"log"
 
@@ -10,13 +10,12 @@ import (
 )
 
 type PublishRequest struct {
-	Topic string `json:"topic"`
+	Topic   string `json:"topic"`
 	Message string `json:"message"`
 }
 
-func PublishHandler(w http.ResponseWriter, r *http.Request){
-	// Parse body
-	body, err := ioutil.ReadAll(r.Body)
+func PublishHandler(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "Failed to read body", http.StatusBadRequest)
 		return
@@ -34,31 +33,30 @@ func PublishHandler(w http.ResponseWriter, r *http.Request){
 		return
 	}
 
-	// Initialize topic if needed
 	InitTopic(req.Topic)
 
 	msg := []byte(req.Message)
-
-	// Convert to binary and store
 	AddMessage(req.Topic, msg)
 
-	// Step 2: fan-out to all subscribers
 	subscriberMutex.RLock()
 	subscribers, ok := Subscribers[req.Topic]
 	subscriberMutex.RUnlock()
 
 	if ok {
-		for conn := range subscribers {
-			go func(c *websocket.Conn) {
-				if err := c.WriteMessage(websocket.BinaryMessage, msg); err != nil {
+		for s := range subscribers {
+			go func(sub *Subscriber) {
+				sub.WriteLock.Lock()
+				err := sub.Conn.WriteMessage(websocket.BinaryMessage, msg)
+				sub.WriteLock.Unlock()
+
+				if err != nil {
 					log.Printf("[Fanout] Failed to write to subscriber: %v", err)
-					removeSubscriber(req.Topic, c)
+					removeSubscriber(req.Topic, sub)
 				}
-			}(conn)
+			}(s)
 		}
 	}
 
-	// Respond
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`{"status":"message accepted"}`))
 }
