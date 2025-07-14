@@ -20,15 +20,11 @@ type Discovery struct {
 
 var (
 	mutex        sync.RWMutex
-	emitterAddrs []string
-	readerAddrs  []string
+	fluxNodeAddrs []string
 )
 
 func StartWatcher() {
-	go watchPods("app=flux-node", &emitterAddrs)
-	go watchPods("app=flux-node", &readerAddrs)
-	// go watchPods("app=flux-emitter", &emitterAddrs)
-	// go watchPods("app=flux-reader", &readerAddrs)
+	go watchPods("app=flux-node", &fluxNodeAddrs)
 }
 
 func watchPods(labelSelector string, store *[]string) {
@@ -59,12 +55,6 @@ func watchPods(labelSelector string, store *[]string) {
 		var updated []string
 		for _, pod := range pods.Items {
 
-			// for _, c := range pod.Spec.Containers {
-			// 	for _, port := range c.Ports {
-			// 		log.Printf("Pod: %s, Container: %s, Port: %d", pod.Name, c.Name, port.ContainerPort)
-			// 	}
-			// }
-
 			if pod.Status.Phase == v1.PodRunning {
 				ip := pod.Status.PodIP
 
@@ -82,15 +72,8 @@ func watchPods(labelSelector string, store *[]string) {
 	}
 }
 
-
-func GetEmitterAddrs() []string {
+func GetFluxNodeAddrs() []string {
 	mutex.RLock()
 	defer mutex.RUnlock()
-	return append([]string(nil), emitterAddrs...) // return a copy
-}
-
-func GetReaderAddrs() []string {
-	mutex.RLock()
-	defer mutex.RUnlock()
-	return append([]string(nil), readerAddrs...) // return a copy
+	return append([]string(nil), fluxNodeAddrs...) // return a copy
 }
