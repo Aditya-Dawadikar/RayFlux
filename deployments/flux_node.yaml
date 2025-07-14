@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: flux-node
 spec:
-  replicas: 1
+  # replicas: 1
   selector:
     matchLabels:
       app: flux-node
@@ -23,6 +23,13 @@ spec:
               name: flux-config
           - secretRef:
               name: flux-secrets
+        resources:
+              requests:
+                cpu: "100m"
+                memory: "128Mi"
+              limits:
+                cpu: "500m"
+                memory: "256Mi"
 # ---
 # apiVersion: v1
 # kind: Service

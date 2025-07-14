@@ -5,7 +5,7 @@ metadata:
   labels:
     app: flux-balancer
 spec:
-  replicas: 1
+  # replicas: 1
   selector:
     matchLabels:
       app: flux-balancer
@@ -21,6 +21,13 @@ spec:
         imagePullPolicy: Never
         ports:
         - containerPort: 8083
+        resources:
+              requests:
+                cpu: "100m"
+                memory: "128Mi"
+              limits:
+                cpu: "500m"
+                memory: "256Mi"
 
 ---
 apiVersion: v1
