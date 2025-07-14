@@ -25,8 +25,10 @@ var (
 )
 
 func StartWatcher() {
-	go watchPods("app=flux-emitter", &emitterAddrs)
-	go watchPods("app=flux-reader", &readerAddrs)
+	go watchPods("app=flux-node", &emitterAddrs)
+	go watchPods("app=flux-node", &readerAddrs)
+	// go watchPods("app=flux-emitter", &emitterAddrs)
+	// go watchPods("app=flux-reader", &readerAddrs)
 }
 
 func watchPods(labelSelector string, store *[]string) {
