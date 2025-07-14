@@ -26,3 +26,7 @@ secrets.txt
 reference.txt
 commands.txt
 **/test_env/
+
+# python gitignore
+__pycache__
+venv

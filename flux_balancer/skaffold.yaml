@@ -17,3 +17,4 @@ deploy:
     manifests:
     - deployments/*.yaml
     - ../deployments/flux_balancer.yaml
+    - ../deployments/flux_balancer_hpa.yaml

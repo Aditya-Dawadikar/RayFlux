@@ -9,7 +9,12 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-var Subscribers = make(map[string]map[*websocket.Conn]bool)
+type Subscriber struct {
+	Conn      *websocket.Conn
+	WriteLock sync.Mutex
+}
+
+var Subscribers = make(map[string]map[*Subscriber]bool)
 var subscriberMutex sync.RWMutex
 
 var upgrader = websocket.Upgrader{
@@ -23,7 +28,6 @@ func SubscribeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Step 1: read initial subscribe message (JSON with topic + subscriber_id)
 	_, msg, err := conn.ReadMessage()
 	if err != nil {
 		log.Println("[SubscribeHandler] Failed to read subscribe message:", err)
@@ -44,39 +48,38 @@ func SubscribeHandler(w http.ResponseWriter, r *http.Request) {
 
 	InitTopic(req.Topic)
 
-	// Register the connection
+	subscriber := &Subscriber{Conn: conn}
+
 	subscriberMutex.Lock()
 	if _, ok := Subscribers[req.Topic]; !ok {
-		Subscribers[req.Topic] = make(map[*websocket.Conn]bool)
+		Subscribers[req.Topic] = make(map[*Subscriber]bool)
 	}
-	Subscribers[req.Topic][conn] = true
+	Subscribers[req.Topic][subscriber] = true
 	subscriberMutex.Unlock()
 
 	log.Printf("[Subscriber] Connected: %s on topic '%s'", req.SubscriberID, req.Topic)
 
-	// Wait for disconnect
-	go waitForDisconnect(req.Topic, conn)
+	go waitForDisconnect(req.Topic, subscriber)
 }
 
-
-func waitForDisconnect(topic string, conn *websocket.Conn) {
+func waitForDisconnect(topic string, s *Subscriber) {
 	for {
-		_, _, err := conn.NextReader()
+		_, _, err := s.Conn.NextReader()
 		if err != nil {
 			log.Printf("[Subscriber] Disconnected from topic '%s'", topic)
-			removeSubscriber(topic, conn)
+			removeSubscriber(topic, s)
 			return
 		}
 	}
 }
 
-func removeSubscriber(topic string, conn *websocket.Conn) {
+func removeSubscriber(topic string, s *Subscriber) {
 	subscriberMutex.Lock()
 	defer subscriberMutex.Unlock()
 
 	if conns, ok := Subscribers[topic]; ok {
-		delete(conns, conn)
-		conn.Close()
+		delete(conns, s)
+		s.Conn.Close()
 
 		if len(conns) == 0 {
 			delete(Subscribers, topic)
