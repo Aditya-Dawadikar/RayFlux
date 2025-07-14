@@ -47,10 +47,10 @@ func ProxySubscribe(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Printf("[ProxySubscribe] Subscriber=%s, Topic=%s", req.SubscriberID, req.Topic)
 
-	// Step 3: Choose FluxReader pod
-	podIPs := discovery.GetReaderAddrs()
+	// Step 3: Choose FluxNode pod
+	podIPs := discovery.GetFluxNodeAddrs()
 	if len(podIPs) == 0 {
-		clientConn.WriteMessage(websocket.TextMessage, []byte(`{"error":"No reader pods available"}`))
+		clientConn.WriteMessage(websocket.TextMessage, []byte(`{"error":"No fluxnode pods available"}`))
 		return
 	}
 	index := hash.GetConsistentIndex(req.SubscriberID, req.Topic, podIPs)
@@ -58,21 +58,21 @@ func ProxySubscribe(w http.ResponseWriter, r *http.Request) {
 		clientConn.WriteMessage(websocket.TextMessage, []byte(`{"error":"Hashing failed"}`))
 		return
 	}
-	target := fmt.Sprintf("ws://%s:8082/subscribe", podIPs[index])
-	log.Printf("[ProxySubscribe] Routing to reader pod: %s", target)
+	target := fmt.Sprintf("ws://%s:%s/subscribe", podIPs[index], DEFAULT_FLUXNODE_PORT)
+	log.Printf("[ProxySubscribe] Routing to fluxnode pod: %s", target)
 
-	// Step 4: Connect to the chosen reader pod
-	readerURL := url.URL{Scheme: "ws", Host: podIPs[index] + ":8082", Path: "/subscribe"}
-	readerConn, _, err := websocket.DefaultDialer.Dial(readerURL.String(), nil)
+	// Step 4: Connect to the chosen fluxnode pod
+	fluxNodeURL := url.URL{Scheme: "ws", Host: podIPs[index] + ":" + DEFAULT_FLUXNODE_PORT, Path: "/subscribe"}
+	fluxNodeConn, _, err := websocket.DefaultDialer.Dial(fluxNodeURL.String(), nil)
 	if err != nil {
-		log.Printf("[ProxySubscribe] Failed to connect to reader pod: %v", err)
-		clientConn.WriteMessage(websocket.TextMessage, []byte(`{"error":"Failed to connect to reader pod"}`))
+		log.Printf("[ProxySubscribe] Failed to connect to fluxnode pod: %v", err)
+		clientConn.WriteMessage(websocket.TextMessage, []byte(`{"error":"Failed to connect to fluxnode pod"}`))
 		return
 	}
-	defer readerConn.Close()
+	defer fluxNodeConn.Close()
 
-	// Step 5: Forward initial message to reader
-	if err := readerConn.WriteMessage(websocket.TextMessage, msg); err != nil {
+	// Step 5: Forward initial message to fluxnode
+	if err := fluxNodeConn.WriteMessage(websocket.TextMessage, msg); err != nil {
 		log.Printf("[ProxySubscribe] Failed to forward subscription request: %v", err)
 		return
 	}
@@ -80,8 +80,8 @@ func ProxySubscribe(w http.ResponseWriter, r *http.Request) {
 	// Step 6: Bidirectional proxying
 	errc := make(chan error, 2)
 
-	go proxyWebSocket(clientConn, readerConn, errc)
-	go proxyWebSocket(readerConn, clientConn, errc)
+	go proxyWebSocket(clientConn, fluxNodeConn, errc)
+	go proxyWebSocket(fluxNodeConn, clientConn, errc)
 
 	<-errc // wait for either direction to fail
 }

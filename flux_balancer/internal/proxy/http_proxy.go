@@ -12,8 +12,6 @@ import (
 	"flux_balancer/internal/hash"
 )
 
-const defaultEmitterPort = "8080"
-
 type PublishRequest struct {
 	PublisherID string `json:"publisher_id"`
 	Topic       string `json:"topic"`
@@ -29,7 +27,7 @@ func ProxyPublish(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("[ProxyPublish] Received message: PublisherID=%s Topic=%s", req.PublisherID, req.Topic)
 
-	podIPs := discovery.GetEmitterAddrs()
+	podIPs := discovery.GetFluxNodeAddrs()
 	if len(podIPs) == 0 {
 		http.Error(w, "no emitter pods available", http.StatusServiceUnavailable)
 		return
@@ -41,7 +39,7 @@ func ProxyPublish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	target := fmt.Sprintf("http://%s:%s/publish", podIPs[index], defaultEmitterPort)
+	target := fmt.Sprintf("http://%s:%s/publish", podIPs[index], DEFAULT_FLUXNODE_PORT)
 
 	log.Printf("[ProxyPublish] Routing to emitter pod: %s", target)
 
