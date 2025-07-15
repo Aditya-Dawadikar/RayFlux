@@ -53,7 +53,7 @@ func ProxySubscribe(w http.ResponseWriter, r *http.Request) {
 		clientConn.WriteMessage(websocket.TextMessage, []byte(`{"error":"No fluxnode pods available"}`))
 		return
 	}
-	index := hash.GetConsistentIndex(req.SubscriberID, req.Topic, podIPs)
+	index := hash.GetConsistentIndex(req.Topic, podIPs)
 	if index == -1 {
 		clientConn.WriteMessage(websocket.TextMessage, []byte(`{"error":"Hashing failed"}`))
 		return

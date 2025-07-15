@@ -5,13 +5,13 @@ import (
 	"math/big"
 )
 
-// GetConsistentIndex returns a stable index based on userID + topic.
-func GetConsistentIndex(userID, topic string, targets []string) int {
+// GetConsistentIndex returns a stable index based on topic.
+func GetConsistentIndex(topic string, targets []string) int {
 	if len(targets) == 0 {
 		return -1
 	}
 
-	key := userID + "|" + topic
+	key := topic
 
 	hasher := sha1.New()
 	hasher.Write([]byte(key))

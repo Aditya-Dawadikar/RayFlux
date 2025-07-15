@@ -6,9 +6,13 @@ import (
 
 	"github.com/gorilla/mux"
 	"flux_node/controllers"
+	"flux_node/services"
 )
 
 func main() {
+
+	services.InitS3Client()
+
 	r := mux.NewRouter()
 	r.HandleFunc("/publish", controllers.PublishHandler).Methods("POST")
 	r.HandleFunc("/subscribe", controllers.SubscribeHandler).Methods("GET")
