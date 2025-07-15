@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: flux-config
+data:
+  S3_BUCKET_NAME: rayflux-store
+  AWS_REGION: us-east-2

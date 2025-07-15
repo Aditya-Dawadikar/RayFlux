@@ -33,7 +33,7 @@ func ProxyPublish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	index := hash.GetConsistentIndex(req.PublisherID,req.Topic, podIPs)
+	index := hash.GetConsistentIndex(req.Topic, podIPs)
 	if index == -1 {
 		http.Error(w, "hashing failed", http.StatusInternalServerError)
 		return
