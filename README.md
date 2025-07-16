@@ -6,12 +6,11 @@ RayFlux is a **real-time, stateless, and horizontally scalable publish-subscribe
 
 ## Features
 
-- **High Throughput**: Achieves 1600+ RPS under 100ms latency in constrained environments.
+- **High Throughput**: Achieves 5000+ RPS under 100ms average latency in constrained environments.
 - **Stateless Nodes**: All FluxNodes and FluxBalancers are completely stateless, enabling elastic scaling.
 - **WebSocket-First**: Native push-based architecture, no polling required.
 - **Dual Buffering**: Optimized for near-real-time streaming with best-effort consistency.
-- **S3-based Persistence (Planned)**: Message snapshots for recovery and offline delivery.
-- **FluxManager (Planned)**: Control plane for managing clients, topics, and failover logic.
+- **S3-based Persistence**: Message snapshots for recovery and offline delivery.
 
 ---
 
@@ -26,10 +25,13 @@ RayFlux is a **real-time, stateless, and horizontally scalable publish-subscribe
 
 ## Benchmark Highlights
 
-- **Tested with 100–500 concurrent users**
-- **0% failure up to 300 subscribers**
-- **Autoscaling FluxNode & FluxBalancer pods (min 2, max 5)**
-- **Real-time WebSocket delivery with event-based metrics**
+- **Tested with 200 concurrent users, 10 Topics**
+- **FluxNode and FluxBalancer Pod Count: 5**
+- **Average Latency: 86.91ms**
+- **95%ile Latency: 160ms**
+- **99%ile Latency: 210ms**
+- **RPS: 5974**
+- **0% failure**
 
 > Resource Constraints Used:
 ```yaml
@@ -58,6 +60,13 @@ RayFlux/
 Start Minikube
 ```
 minikube start
+```
+
+Create Secrets
+```
+kubectl create secret generic flux-secrets \
+--from-literal=AWS_ACCESS_KEY_ID=<AWS_ACCESS_KEY> \
+--from-literal=AWS_SECRET_ACCESS_KEY=<AWS_SECRET_ACCESS_KEY>
 ```
 
 Start FluxBalancer
