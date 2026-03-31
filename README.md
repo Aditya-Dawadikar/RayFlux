@@ -21,6 +21,8 @@ RayFlux is a **real-time, stateless, and horizontally scalable publish-subscribe
 - `Locust`: Used for load generation and benchmarking.
 - `K8s`: Horizontal scaling via HPA with optional resource constraints.
 
+![architecture](./ray-flux-infra.png)
+
 ---
 ## How it works
 
@@ -41,6 +43,8 @@ RayFlux is designed as a **real-time ephemeral streaming system** optimized for 
 * This path is fully in-memory and optimized for **minimal latency and high throughput**.
 * Messages are delivered **only when both publisher and subscriber are actively connected** (no replay).
 
+![hotpath](./ray-flux-hot-path.png)
+
 ---
 
 ### 3. Buffering & Backpressure Handling
@@ -60,6 +64,8 @@ RayFlux is designed as a **real-time ephemeral streaming system** optimized for 
   1. Flush buffer contents to local disk
   2. Upload data to S3 as immutable snapshots (JSONL format)
 * Persistence is **fully decoupled from live delivery**, ensuring high throughput.
+
+![coldpath](./ray-flux-cold-path.png)
 
 ---
 
